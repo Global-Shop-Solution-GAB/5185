@@ -1,0 +1,672 @@
+Program.Sub.ScreenSU.Start
+Gui.fMain..Create
+Gui.fMain..Caption("ECAT Export")
+Gui.fMain..Size(15360,10695)
+Gui.fMain..MinX(0)
+Gui.fMain..MinY(0)
+Gui.fMain..Position(0,0)
+Gui.fMain..BackColor(-2147483633)
+Gui.fMain..MousePointer(0)
+Gui.fMain..Event(UnLoad,fMain_UnLoad)
+Gui.fMain.GsGcExport.Create(GsGridControl)
+Gui.fMain.GsGcExport.Size(15015,9990)
+Gui.fMain.GsGcExport.Position(60,60)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+V.GLOBAL.SGV.Declare
+
+'Function.Intrinsic.Debug.InvokeDebugger
+
+F.Intrinsic.UI.InvokeWaitDialog("Retrieving Data","PRODUCT DATA FILE Export")
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass,10000)
+
+f.Intrinsic.Control.CallSub(BuildInitDTs)
+f.Intrinsic.Control.CallSub(RelatedItems)
+f.Intrinsic.Control.CallSub(JoinDTs)
+F.Intrinsic.Control.CallSub(AddColumns)
+f.Intrinsic.Control.CallSub(CreateDVGV)
+f.Intrinsic.Control.CallSub(FormatGV)
+f.Intrinsic.Control.CallSub(ExportToExcel)
+F.Intrinsic.Control.CallSub(unload)
+
+Program.Sub.Main.End
+
+Program.Sub.fMain_UnLoad.Start
+gui.fMain..Visible(0)
+F.Intrinsic.Control.CallSub(unload)
+Program.Sub.fMain_UnLoad.End
+
+Program.Sub.Unload.Start
+
+F.Intrinsic.UI.CloseWaitDialog
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+Program.Sub.Unload.End
+
+Program.Sub.BuildInitDTs.Start
+v.Local.sSQL.Declare
+V.Local.SFILE.Declare
+V.Local.SFILECONTENTS.Declare
+V.Local.SCOLUMNS.Declare
+'BUILD INITIAL DATA TABLES
+
+'INVENTORY MAIN - M
+v.Local.sSQL.Set("SELECT RTRIM(IM1.PART) AS 'PART',rtrim(IM1.CODE_SORT) as CODE_SORT, RTRIM(IM1.PRODUCT_LINE) AS PRODUCT_LINE, (RTRIM(IM1.DESCRIPTION) + RTRIM(IM1.DESCRIPTION_2) + RTRIM(IM1.DESCRIPTION_3)) AS 'PRODUCT NAME', RTRIM(INSORT.DESCR) AS 'Collection', RTRIM(IM1.TEXT_INFO2) AS 'STYLE', IM1.LBS AS 'HANGING WEIGHT (LBS)', IM1.WIDTH AS 'ITEM WIDTH (IN)', IM1.LENGTH AS 'ITEM HEIGHT (IN)', IM1.DENSITY_RAW_MATL AS 'ITEM DEPTH (EXT)(IN)', LEFT(IM1.TEXT_INFO1,2) AS 'QUICK SHIP', cast(IM1.AMT_PRICE as FLOAT) AS 'DISTRIBUTORS_NET', cast('10' as Float) AS 'DROP_SHIP_FEE', IM1.DATE_LAST_CHG AS 'LAST UPDATED' FROM V_INVENTORY_ALL IM1 LEFT JOIN INV_SORT INSORT ON INSORT.SORT_CODE = IM1.CODE_SORT WHERE IM1.LOCATION = '01' ORDER BY PART;")
+
+f.Data.DataTable.CreateFromSQL("dtIM1","con",v.Local.sSQL,TRUE)
+
+'F.Data.DataView.Create("dtIM1","dvIM1")
+'V.Local.SCOLUMNS.Set(F.Data.DataView.)
+'f.Data.DataView.ToString("dtIM1","dvIM1",,v.Ambient.Tab,v.Ambient.NewLine,v.Local.SFILECONTENTS)
+'f.Intrinsic.String.build("C:\users\tmaynard\desktop\DT{0}","IM1",v.Local.SFILE)
+'f.Intrinsic.File.String2File(v.Local.SFILE,v.Local.SFILECONTENTS)
+
+
+'INVENTORY XREF - X
+V.Local.sSQL.Set("SELECT RTRIM(IXR.PART) AS PART, RTRIM(IXR.USER_DEFINED_PART) AS 'UPC' FROM V_INV_CROSS_REF IXR WHERE IXR.VENDOR = '1' and IXR.LOCATION = '01' ORDER BY IXR.PART;")
+
+f.Data.DataTable.CreateFromSQL("dtIXR","con",v.Local.sSQL,TRUE)
+
+
+
+'CONTAINER INFO - C
+V.Local.sSQL.Set("SELECT RTRIM(IM1.PART) AS PART,CNT1.LENGTH AS 'PACKAGE DEPTH (IN)1',CNT1.WIDTH AS 'PACKAGE WIDTH (IN)1',CNT1.HEIGHT AS 'PACKAGE HEIGHT (IN)1',CNT2.LENGTH AS 'PACKAGE DEPTH (IN)2',CNT2.WIDTH AS 'PACKAGE WIDTH (IN)2',CNT2.HEIGHT AS 'PACKAGE HEIGHT (IN)2',CNT3.LENGTH AS 'PACKAGE DEPTH (IN)3',CNT3.WIDTH AS 'PACKAGE WIDTH (IN)3',CNT3.HEIGHT AS 'PACKAGE HEIGHT (IN)3',CNT4.LENGTH AS 'PACKAGE DEPTH (IN)4',CNT4.WIDTH AS 'PACKAGE WIDTH (IN)4',CNT4.HEIGHT AS 'PACKAGE HEIGHT (IN)4',RTRIM(ICI1.PKGD_WEIGHT) AS 'SHIPPING_WEIGHT1',RTRIM(ICI2.PKGD_WEIGHT) AS 'SHIPPING_WEIGHT2',RTRIM(ICI3.PKGD_WEIGHT) AS 'SHIPPING_WEIGHT3',RTRIM(ICI4.PKGD_WEIGHT) AS 'SHIPPING_WEIGHT4' FROM V_INVENTORY_All IM1 LEFT JOIN V_INV_CROSS_REF IXR ON IXR.PART = IM1.PART AND VENDOR = '1'LEFT JOIN V_PRODUCT_LINE PL ON PL.PRODUCT_LINE = IM1.PRODUCT_LINE LEFT JOIN V_INV_ALT_PRICE IAP ON IAP.PART = IM1.PART AND IAP.LOCN = IM1.LOCATION LEFT JOIN V_INV_CNTR_INFO ICI1 ON IM1.PART = ICI1.PART AND IM1.LOCATION = ICI1.LOCN AND ICI1.SEQ = '000001' LEFT JOIN V_INV_CNTR_INFO ICI2 ON IM1.PART = ICI2.PART AND IM1.LOCATION = ICI2.LOCN AND ICI2.SEQ = '000002' LEFT JOIN V_INV_CNTR_INFO ICI3 ON IM1.PART = ICI3.PART AND IM1.LOCATION = ICI3.LOCN AND ICI3.SEQ = '000003' LEFT JOIN V_INV_CNTR_INFO ICI4 ON IM1.PART = ICI4.PART AND IM1.LOCATION = ICI4.LOCN AND ICI4.SEQ = '000004' LEFT JOIN V_BOL_CONTAINERS CNT1 ON CNT1.CNTNR_CODE = ICI1.CNTNR_CODE LEFT JOIN V_BOL_CONTAINERS CNT2 ON CNT2.CNTNR_CODE = ICI2.CNTNR_CODE LEFT JOIN V_BOL_CONTAINERS CNT3 ON CNT3.CNTNR_CODE = ICI3.CNTNR_CODE LEFT JOIN V_BOL_CONTAINERS CNT4 ON CNT4.CNTNR_CODE = ICI4.CNTNR_CODE WHERE IM1.LOCATION = '01' ORDER BY IM1.PART;")
+
+f.Data.DataTable.CreateFromSQL("dtICI","con",v.Local.sSQL,TRUE)
+
+
+
+'ALT PRICE - A
+V.Local.sSQL.Set("SELECT RTRIM(IAP.PART) AS PART,CASE IAP.ALT_PRICE_5 WHEN 0 THEN CONVERT(0,SQL_FLOAT) ELSE CONVERT(IAP.ALT_PRICE_5,SQL_FLOAT) END AS 'IMAP PRICE',CASE IAP.ALT_PRICE_10 WHEN 0 THEN CONVERT(0,SQL_FLOAT) ELSE CONVERT(IAP.ALT_PRICE_10,SQL_FLOAT) END AS 'SPECIAL NET (PROMO PRICE)' FROM V_INV_ALT_PRICE IAP WHERE IAP.LOCN = '01' ORDER BY IAP.PART;")
+
+f.Data.DataTable.CreateFromSQL("dtIAP","con",v.Local.sSQL,TRUE)
+
+'PRODUCT LINE - P
+V.Local.sSQL.Set("SELECT RTRIM(PL.PRODUCT_LINE) AS PRODUCT_LINE, PL.PRODUCT_LINE_NAME  FROM V_PRODUCT_LINE PL ORDER BY PL.PRODUCT_LINE;")
+
+f.Data.DataTable.CreateFromSQL("dtPL","con",v.Local.sSQL,TRUE)
+
+
+
+F.Intrinsic.UI.ChangeWaitStatus("Retrieving Extra Information",2,0,10)
+
+'EXTRA USER FIELDS - E
+V.Local.sSQL.Set("SELECT RTRIM(IEX.PART) AS 'PART', IF(RTRIM(IEX.USER34) = '',(IF(RTRIM(IEX.USER43) = '','',RTRIM(IEX.USER43))),IF(RTRIM(IEX.USER43) = '',RTRIM(IEX.USER34),RTRIM(IEX.USER34) + ', ' + RTRIM(IEX.USER43))) AS 'LISTING', RTRIM(IEX.USER42) AS 'DISCONTINUED',RTRIM(IEX.USER1) AS 'MODEL',IF(RTRIM(IEX.USER50) = 'Y','X-JAN',IF(RTRIM(IEX.USER51) = 'Y','X-JUNE','')) AS 'NEW',CONCAT(RTRIM(IEX.USER7),CONCAT(' ',RTRIM(IEX.USER8))) AS 'PRIMARY MATERIAL', IF(RTRIM(IEX.USER5) = '',IF(RTRIM(IEX.USER6) = '','',RTRIM(IEX.USER6)),IF(RTRIM(IEX.USER6) = '',RTRIM(IEX.USER5),RTRIM(IEX.USER5) + ' + ' + RTRIM(IEX.USER6))) AS 'FINISH',RTRIM(IEX.USER2) AS 'CRYSTAL TYPE',RTRIM(IEX.USER10) AS 'GLASS/SHADE MATERIAL',RTRIM(IEX.USER20) AS 'OVERALL HEIGHT (IN)',IF(RTRIM(IEX.USER23) = '',RTRIM(IEX.USER24),RTRIM(IEX.USER23)) AS 'CANOPY/BACKPLATE',RTRIM(IEX.USER35) AS USER35,RTRIM(IEX.USER35) AS 'TOTAL # LIGHTS',RTRIM(IEX.USER27) AS '# OF LIGHTS 1',RTRIM(IEX.USER26) AS 'WATTAGE 1',RTRIM(IEX.USER25) AS 'BULB BASE 1',RTRIM(IEX.USER31) AS '# OF LIGHTS 2',RTRIM(IEX.USER30) AS 'WATTAGE 2',RTRIM(IEX.USER29) AS 'BULB BASE 2',RTRIM(IEX.USER21) AS 'GLASS DIAMETER (IN) BOTTOM BOWL',RTRIM(IEX.USER22) AS 'GLASS DIAMETER (IN) TOP BOWL',RTRIM(IEX.USER9) AS 'SHADE SHAPE', RTRIM(IEX.USER44) AS USER44,RTRIM(IEX.USER12) AS 'SHADE DIMENSIONS (IN)',RTRIM(IEX.USER16) AS 'WIRE LENGTH (IN)',cast(RTRIM(IEX.USER17) as FLOAT) AS 'REPLACEMENT GLASS/SHADES',cast(RTRIM(IEX.USER19) as FLOAT) AS 'CHAIN COST (PER FOOT)',IF(RTRIM(IEX.USER18) = '',RTRIM(IEX.USER15),RTRIM(IEX.USER18)) AS 'CHAIN OR ROD LENGTH (IN)',RTRIM(IEX.USER57) AS 'U = UPS, O = OVERSIZED, T = TRUCK',RTRIM(IEX.USER45) AS 'CATALOG',IF(UPPER(RTRIM(IEX.USER41)) = 'X','X','') AS 'OVERSTOCK',RTRIM(IEX.USER2) AS USER2, RTRIM(IEX.USER5) AS USER5, RTRIM(IEX.USER6) AS USER6, RTRIM(IEX.USER7) AS USER7, RTRIM(IEX.USER8) AS USER8,RTRIM(IEX.USER33) AS 'INTERIOR/EXTERIOR' FROM INV_EXTRA IEX WHERE IEX.REV = '' AND IEX.LOCATION = '01' AND IEX.USER40 <> 'NOEX' ORDER BY IEX.PART;")
+
+f.Data.DataTable.CreateFromSQL("dtIEX","con",v.Local.sSQL,TRUE)
+
+
+
+'EXTRA TEXT - T
+V.Local.sSQL.Set("SELECT RTRIM(IET.PART) AS PART,RTRIM(IET.TEXT) AS 'ROMANCE COPY' FROM INV_EXTRA_TEXT IET ORDER BY IET.PART;")
+
+f.Data.DataTable.CreateFromSQL("dtIET","con",v.Local.sSQL,TRUE)
+
+
+Program.Sub.BuildInitDTs.End
+
+Program.Sub.JoinDTs.Start
+v.Local.sColumns.Declare
+
+F.Intrinsic.UI.ChangeWaitStatus("Joining Data",4,0,10)
+
+'JOIN ALL DATA TABLES
+V.Local.sColumns.Set("E.MODEL*!*E.DISCONTINUED*!*E.New*!*E.LISTING*!*X.UPC*!*M.Product Name*!*M.Collection*!*M.PRODUCT_LINE*!*E.Primary Material*!*E.Finish*!*E.Crystal Type*!*E.Glass/Shade Material*!*M.Style*!*T.Romance Copy*!*E.Interior/Exterior*!*M.Hanging Weight (lbs)*!*M.Item Width (in)*!*M.Item Height (in)*!*M.Item Depth (Ext)(in)*!*E.Overall Height (in)*!*E.Canopy/Backplate*!*E.Total # Lights*!*E.# of Lights 1*!*E.Wattage 1*!*E.Bulb Base 1*!*E.# of Lights 2*!*E.Wattage 2*!*E.Bulb Base 2*!*E.Glass Diameter (in) Bottom Bowl*!*E.Glass Diameter (in) Top Bowl*!*E.Shade Shape*!*E.Shade Dimensions (in)*!*E.Chain or Rod Length (in)*!*E.Wire Length (in)*!*E.Replacement Glass/Shades*!*E.Chain Cost (Per Foot)*!*C.Package Depth (in)1*!*C.Package Width (in)1*!*C.Package Height (in)1*!*C.Package Depth (in)2*!*C.Package Width (in)2*!*C.Package Height (in)2*!*C.Package Depth (in)3*!*C.Package Width (in)3*!*C.Package Height (in)3*!*C.Package Depth (in)4*!*C.Package Width (in)4*!*C.Package Height (in)4*!*C.SHIPPING_WEIGHT1*!*C.SHIPPING_WEIGHT2*!*C.SHIPPING_WEIGHT3*!*C.SHIPPING_WEIGHT4*!*E.U = UPS, O = Oversized, T = Truck*!*M.Quick Ship*!*E.Catalog*!*M.DISTRIBUTORS_NET*!*M.DROP_SHIP_FEE*!*A.IMAP Price*!*A.Special Net (Promo Price)*!*E.Overstock*!*M.Last Updated*!*S.RELATEDPRODUCTS*!*E.USER7*!*E.USER8*!*E.USER5*!*E.USER6*!*E.USER2*!*E.USER35*!*E.USER44*!*P.PRODUCT_LINE_NAME")
+'S.RELATEDPRODUCTS*!*
+'
+'			O	O
+'			  ^
+'		   [_____]
+'
+'NEED TO FINISH OUT JOIN.
+
+F.Data.Linq.Join("LeftJoin","datatable","dtIEX*!*E","datatable","dtIM1*!*M","E.PART = M.PART","datatable","dtPL*!*P","M.PRODUCT_LINE = P.PRODUCT_LINE","datatable","dtIET*!*T","E.PART = T.PART","datatable","dtIAP*!*A","E.PART = A.PART","datatable","dtICI*!*C","E.PART = C.PART","datatable","dtIXR*!*X","E.PART = X.PART","datatable","dtSimilar*!*S","M.CODE_SORT = S.SortCode",V.Local.sColumns,"E.MODEL <> ''","","","dtJoin",True)
+'"datatable","dtSimilar*!*S","M.Collection = S.SortCode",
+
+
+Program.Sub.JoinDTs.End
+
+Program.Sub.AddColumns.Start
+
+F.Intrinsic.UI.ChangeWaitStatus("Adding Additional Columns",6,0,10)
+
+'ADD ADDITIONAL COLUMNS AND EXPRESSION COLUMNS
+'COLUMNS
+'F.Data.DataTable.AddColumn("dtJoin","LISTING","String","UL, CUL, or CSA")
+'LISTING should be USER34 ', ' USER43
+F.Data.DataTable.AddColumn("dtJoin","# OF LIGHTS 3","String","")
+F.Data.DataTable.AddColumn("dtJoin","WATTAGE 3","String","")
+F.Data.DataTable.AddColumn("dtJoin","BULB BASE 3","String","")
+F.Data.DataTable.AddColumn("dtJoin","# OF LIGHTS 4","String","")
+F.Data.DataTable.AddColumn("dtJoin","WATTAGE 4","String","")
+F.Data.DataTable.AddColumn("dtJoin","BULB BASE 4","String","")
+F.Data.DataTable.AddColumn("dtJoin","# OF LIGHTS (INSIDE)","String","")
+F.Data.DataTable.AddColumn("dtJoin","WATTAGE (INSIDE)","String","")
+F.Data.DataTable.AddColumn("dtJoin","BULB BASE (INSIDE)","String","")
+F.Data.DataTable.AddColumn("dtJoin","Image Updated","String","")
+F.Data.DataTable.AddColumn("dtJoin","ADDED TO OVERSTOCK JULY 2017","String","ADDED TO OVERSTOCK JULY 2017")
+F.Data.DataTable.AddColumn("dtJoin","Attribute 1","String","Crystorama chandeliers combine high-style design with premium materials and manufacturing techniques.")
+F.Data.DataTable.AddColumn("dtJoin","Attribute 2","String","Through intelligent product development and the use of smart package design, Crystorama maintains lower damage rates in lighting.")
+F.Data.DataTable.AddColumn("dtJoin","BIO","String","There is undeniable magic when light meets exquisite crystal and glass. The family-owned design house of Crystorama has been celebrating this marriage for more than 50 years in its lighting creations. Crystorama is known for its standout lighting, which is exceptional in quality and design. With every chandelier it manufactures, Crystorama draws upon its history, knowledge, and legacy of stellar craftsmanship, and then embraces modern shapes, inspirations, and materials. From traditional all-crystal designs, to princess mini chandeliers, to even transitional lighting collections, Crystorama offers styles that will match any decor and are always in fashion.")
+'F.Data.DataTable.AddColumn("dtJoin","DISCONTINUED","String","")
+f.Data.DataTable.AddColumn("dtJoin","Glass Height (in) Top Bowl","String","")
+f.Data.DataTable.AddColumn("dtJoin","Glass Height (in) Bottom Bowl","String","")
+'Glass Height (in) Top Bowl Glass Height (in) Bottom Bowl
+
+'EXPRESSION COLUMNS
+F.Data.DataTable.AddExpressionColumn("dtJoin","CATEGORY","String","IIF(PRODUCT_LINE = '','',PRODUCT_LINE_NAME)")
+F.Data.DataTable.AddExpressionColumn("dtJoin","MARKETINGCOPY","String","Collection + ' Light ' + USER7 + ' ' + USER8 + ' ' + USER5 + ' ' + USER6 + ' ' + Category + ' ' + USER2 + ' Crystal'")
+'F.Data.DataTable.AddExpressionColumn("dtJoin","TOTAL SHIPPING WEIGHT (LBS)","Long","ISNULL([SHIPPING WEIGHT (LBS)1]) + ISNULL([SHIPPING WEIGHT (LBS)2],0) + ISNULL([SHIPPING WEIGHT (LBS)3],0) + ISNULL([SHIPPING WEIGHT (LBS)4],0)")
+F.Data.DataTable.AddExpressionColumn("dtJoin","TOTAL SHIPPING WEIGHT","Float","Convert(ISNULL(SHIPPING_WEIGHT1,0),'System.Decimal') + Convert(ISNULL(SHIPPING_WEIGHT2,0),'System.Decimal') + Convert(ISNULL(SHIPPING_WEIGHT3,0),'System.Decimal') + Convert(ISNULL(SHIPPING_WEIGHT4,0),'System.Decimal')")
+F.Data.DataTable.AddExpressionColumn("dtJoin","Sub-Category","String","USER35 + ' Light ' + CATEGORY")
+F.Data.DataTable.AddExpressionColumn("dtJoin","SUPPORTING IMAGE NAME","String","IIF(USER44 = '','','Supporting_Images\' + USER44)")
+F.Data.DataTable.AddExpressionColumn("dtJoin","TOTAL PRICE TO ACCOUNT","Float","Convert(DISTRIBUTORS_NET,'System.Int32') + Convert(DROP_SHIP_FEE, 'System.Int32')")
+
+'F.Data.DataTable.AddColumn("dtJoin","","String","")
+'F.Data.DataTable.AddColumn("dtJoin","","String","")
+Program.Sub.AddColumns.End
+
+Program.Sub.FormatGV.Start
+v.Local.sProperty.Declare
+v.Local.iIndex.Declare
+v.Local.sValue.Declare
+
+V.Local.sProperty.Set("VisibleIndex")
+V.Local.iIndex.Set(0)
+
+'A
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"MODEL",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'B
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"New",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'C
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"UPC",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'D
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Product Name",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'E
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Category",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'F
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Sub-Category",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'G
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Attribute 1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'H
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Attribute 2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'I
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Collection",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"RelatedProducts",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'J
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Primary Material",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'K
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Finish",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'L
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Crystal Type",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'M
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Glass/Shade Material",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'N
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Style",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'O
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"MarketingCopy",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'P
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Romance Copy",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'Q
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Interior/Exterior",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'R
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Listing",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'S
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Hanging Weight (lbs)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'T
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Item Width (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'U
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Item Height (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'V
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Item Depth (Ext)(in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'W
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Overall Height (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'X
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Canopy/Backplate",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'Y
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Total # Lights",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'Z
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AA
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AB
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AC
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AD
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AE
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AF
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AH
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AJ
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AK
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AM
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AO
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AP
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights (Inside)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AQ
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage (Inside)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AR
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base (Inside)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AS
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Glass Diameter (in) Bottom Bowl",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Glass Height (in) Bottom Bowl",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AT
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Glass Diameter (in) Top Bowl",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Glass Height (in) Top Bowl",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AU
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Shade Shape",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AV
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Shade Dimensions (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AW
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Chain or Rod Length (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AX
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wire Length (in)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AY
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Replacement Glass/Shades",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'AZ
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Chain Cost (Per Foot)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BA
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Depth (in)1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BB
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Width (in)1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BD
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Height (in)1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BE
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Depth (in)2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BF
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Width (in)2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BI
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Height (in)2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BJ
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Depth (in)3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BK
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Width (in)3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BL
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Height (in)3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BM
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Depth (in)4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BN
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Width (in)4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BO
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Package Height (in)4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BP
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"SHIPPING_WEIGHT1",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BQ
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"SHIPPING_WEIGHT2",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BR
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"SHIPPING_WEIGHT3",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BS
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"SHIPPING_WEIGHT4",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BT
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"TOTAL Shipping Weight",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BU
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"U = UPS, O = Oversized, T = Truck",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+'BV
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Quick Ship",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Catalog",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Distributors_Net",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Drop_Ship_Fee",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Total Price to Account",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"IMAP Price",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Special Net (Promo Price)",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bio",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Discontinued",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Overstock",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Supporting Image Name",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Image Updated",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Last Updated",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Added to Overstock July 2017",V.LOCAL.SPROPERTY,V.LOCAL.IINDEX)
+V.LOCAL.IINDEX.SET(V.LOCAL.IINDEX.++)
+
+V.Local.sProperty.Set("MinWidth")
+V.Local.sValue.Set("200")
+
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"MODEL",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"New",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"UPC",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Product Name",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Category",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Sub-Category",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Attribute 1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Attribute 2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Collection",V.Local.sProperty,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"RelatedProducts",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Primary Material",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Finish",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Crystal Type",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Glass/Shade Material",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Style",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"MarketingCopy",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Romance Copy",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Interior/Exterior",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Listing",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Hanging Weight (lbs)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Item Width (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Item Height (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Item Depth (Ext)(in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Overall Height (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Canopy/Backplate",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Total # Lights",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"# of Lights 1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wattage 1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bulb Base 1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"# of Lights 2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wattage 2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bulb Base 2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"# of Lights 3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wattage 3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bulb Base 3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"# of Lights 4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wattage 4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bulb Base 4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"# of Lights (Inside)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wattage (Inside)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bulb Base (Inside)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Glass Diameter (in) Bottom Bowl",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Glass Diameter (in) Top Bowl",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Shade Shape",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Shade Dimensions (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Chain or Rod Length (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Wire Length (in)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Replacement Glass/Shades",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Chain Cost (Per Foot)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Depth (in)1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Width (in)1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Height (in)1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Depth (in)2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Width (in)2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Height (in)2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Depth (in)3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Width (in)3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Height (in)3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Depth (in)4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Width (in)4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Package Height (in)4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT1",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT2",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT3",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT4",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"TOTAL Shipping Weight",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"U = UPS, O = Oversized, T = Truck",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Quick Ship",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Catalog",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"DISTRIBUTORS_NET",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"DROP_SHIP_FEE",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Total Price to Account",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"IMAP Price",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Special Net (Promo Price)",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Bio",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Discontinued",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Overstock",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Supporting Image Name",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Image Updated",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Last Updated",V.Local.sProperty,V.Local.sValue)
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Added to Overstock July 2017",V.Local.sProperty,V.Local.sValue)
+
+
+v.Local.sProperty.Set("Caption")
+'*!*M.DISTRIBUTORS_NET*!*M.DROP_SHIP_FEE
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"Model",v.Local.sProperty,"Model#")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT1",V.Local.sProperty,"SHIPPING WEIGHT (LBS)1")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT2",V.Local.sProperty,"SHIPPING WEIGHT (LBS)2")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT3",V.Local.sProperty,"SHIPPING WEIGHT (LBS)3")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT4",V.Local.sProperty,"SHIPPING WEIGHT (LBS)4")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"TOTAL Shipping Weight",V.Local.sProperty,"TOTAL SHIPPING WEIGHT (LBS)")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"MARKETINGCOPY",V.Local.sProperty,"Marketing Copy")
+
+'set custom numeric display
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Distributors_Net","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Drop_ship_fee","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Total Price to Account","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"IMAP Price","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Special Net (Promo Price)","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Replacement Glass/Shades","DisplayCustomNumeric","$#,###,##0.00")
+Gui.fMain.GsGcExport.SetColumnProperty(v.Global.SGV,"Chain Cost (Per Foot)","DisplayCustomNumeric","$#,###,##0.00")
+'shipping weights no decimals
+V.Local.sProperty.Set("DisplayCustomNumeric")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT1",V.Local.sProperty,"#,###,##0")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT2",V.Local.sProperty,"#,###,##0")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT3",V.Local.sProperty,"#,###,##0")
+gui.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"SHIPPING_WEIGHT4",V.Local.sProperty,"#,###,##0")
+
+v.Local.sProperty.Set("Visible")
+v.Local.sValue.Set("False")
+'E.USER7*!*E.USER8*!*E.USER5*!*E.USER6*!*E.USER2*!*E.USER35*!*P.PRODUCT_LINE_NAME*!*M.PRODUCT_LINE
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER7",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER8",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER5",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER6",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER2",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"USER35",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"PRODUCT_LINE_NAME",v.Local.sProperty,V.Local.sValue)
+GUI.fMain.GsGcExport.SetColumnProperty(V.GLOBAL.SGV,"PRODUCT_LINE",v.Local.sProperty,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 3",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 3",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 3",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights 4",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage 4",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base 4",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"# of Lights (Inside)",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Wattage (Inside)",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Bulb Base (Inside)",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"Added to Overstock July 2017",V.LOCAL.SPROPERTY,V.Local.sValue)
+GUI.FMAIN.GSGCEXPORT.SETCOLUMNPROPERTY(V.GLOBAL.SGV,"USER44",V.LOCAL.SPROPERTY,V.Local.sValue)
+
+Program.Sub.FormatGV.End
+
+Program.Sub.CreateDVGV.Start
+F.Intrinsic.UI.ChangeWaitStatus("Rendering Data",7,0,10)
+
+'Create DataView and Grid View
+F.Data.DataView.Create("dtJoin","dvJoin")
+'F.Data.DataView.SetFilter("dtJoin","dvJoin","MODEL <> ''")
+gui.fMain.GsGcExport.AddGridviewFromDataview("gvExport","dtJoin","dvJoin")
+gui.fMain.GsGcExport.MainView("gvExport")
+V.GLOBAL.SGV.Set("gvExport")
+Program.Sub.CreateDVGV.End
+
+Program.Sub.ExportToExcel.Start
+V.Local.sFile.Declare
+'allow user to select export path and export
+F.Intrinsic.UI.ChangeWaitStatus("Opening File",9,0,10)
+
+F.Intrinsic.UI.ShowSaveFileDialog("","*.xlsx|*.xlsx",V.Local.sFile)
+
+F.Intrinsic.Control.If(V.Local.sFile,<>,"***CANCEL***")
+	F.Intrinsic.UI.InvokeWaitDialog("Exporting to Excel","PRODUCT DATA FILE Export")
+	gui.fMain.GsGcExport.Export(V.Local.sFile,"xlsx")
+'	F.Intrinsic.Task.ShellExec(0,"",V.Local.sFile,"","",1)
+	f.Intrinsic.UI.Msgbox("Complete!")
+F.Intrinsic.Control.EndIf
+Program.Sub.ExportToExcel.End
+
+Program.Sub.RelatedItems.Start
+v.Local.sSQL.Declare
+V.Local.sReturn.Declare
+v.Local.sSortCode.Declare
+v.Local.sTrack.Declare
+v.Local.iCount.Declare
+v.Local.sSimilarParts.Declare
+v.Local.iCount2.Declare
+v.Local.sWaitStatus.Declare
+V.Local.iLen.Declare
+V.Local.iLen2.Declare
+
+
+'================================================================================similar parts=============================================================================================
+
+'get all user1 values that have the same sort code value
+F.Intrinsic.UI.ChangeWaitStatus("Getting Similar Parts",3,0,10)
+
+'get list of sort codes
+v.Local.sSQL.Set("SELECT RTRIM(SORT_CODE) FROM V_INV_SORT;")
+F.ODBC.Connection!con.EXECUTEANDRETURN(V.Local.sSQL,V.Local.sReturn)
+F.Intrinsic.String.Split(V.Local.sReturn,"#$#",V.Local.sSortCode)
+'loop through list of sort codes and get similar parts for each one
+F.Intrinsic.Control.FOR(V.Local.iCount,0,v.Local.sSortCode.UBound,1)
+	f.Intrinsic.String.Build("Gathering similar parts for sort code {0} of {1}",v.Local.iCount,v.Local.sSortCode.UBound,v.Local.sWaitStatus)
+	f.Intrinsic.UI.ChangeWaitStatus(v.Local.sWaitStatus,v.Local.iCount,0,v.Local.sSortCode.UBound)
+	F.Intrinsic.String.Build("select distinct rtrim(iex.user1) from v_inventory_all val left join inv_extra iex on iex.part = val.part where val.location = '01' and val.code_sort = '{0}';",v.Local.sSortCode(v.Local.iCount),v.Local.ssql)
+	f.ODBC.Connection!con.executeandreturn(v.Local.sSQL,v.Local.sReturn)
+	f.Intrinsic.string.split(v.Local.sReturn,"#$#",v.Local.sreturn)
+
+	'no similar parts
+	f.Intrinsic.Control.If(v.Local.sReturn(0),=,"")
+		f.Intrinsic.Control.GoTo("NextIcount")
+	f.Intrinsic.Control.EndIf
+
+	'if first pass
+	f.Intrinsic.Control.If(v.Local.iCount,=,0)
+	'not the first pass
+	f.Intrinsic.Control.Else
+		'add row delimiter
+	f.Intrinsic.String.Concat(v.Local.sSimilarParts,"!*!",v.Local.sSimilarParts)
+	f.Intrinsic.Control.EndIf
+
+
+	f.Intrinsic.String.Concat(v.Local.ssimilarparts,v.Local.sSortCode(v.Local.iCount),"*!*",v.Local.sSimilarParts)
+	'add on the similar parts (Sort Code*!*part1,part2,...,partn)
+	V.Local.sTrack.Set("")
+	f.Intrinsic.Control.For(v.Local.iCount2,0,v.Local.sReturn.UBound,1)
+		f.Intrinsic.Control.If(v.Local.iCount2,=,0)
+			'if first pass
+			f.Intrinsic.String.Concat(v.Local.sSimilarParts,v.Local.sReturn(v.Local.iCount2),v.Local.sSimilarParts)
+			V.Local.sTrack.Set(V.Local.sReturn(V.Local.iCount2))
+		f.Intrinsic.Control.Else
+			'not the first pass
+			'Only process if total length will be less than 1990
+			F.Intrinsic.String.Len(V.Local.sTrack,V.Local.iLen)
+			F.Intrinsic.String.Len(V.Local.sReturn(V.Local.iCount2),V.Local.iLen2)
+			F.Intrinsic.Math.Add(V.Local.iLen,1,V.Local.iLen2,V.Local.iLen)
+			F.Intrinsic.Control.If(V.Local.iLen,<=,1990)
+				'add comma
+				f.Intrinsic.String.Concat(v.Local.sSimilarParts,",",v.Local.sSimilarParts)
+				f.Intrinsic.String.Concat(v.Local.sSimilarParts,v.Local.sReturn(v.Local.iCount2),v.Local.sSimilarParts)
+				f.Intrinsic.String.Concat(V.Local.sTrack,",",V.Local.sReturn(V.Local.iCount2),V.Local.sTrack)
+			F.Intrinsic.Control.EndIf
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Next(v.Local.iCount2)
+	f.Intrinsic.Control.Label("NextICount")
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'CREATE SIMILAR PARTS DATATABLE
+f.Data.DataTable.CreateFromString("dtSimilar",v.Local.sSimilarParts,"SortCode*!*RelatedProducts","String*!*String","*!*","!*!",True)
+
+'===============================================================================================================================================================================================
+Program.Sub.RelatedItems.End
+
+Program.Sub.Comments.Start
+${$0$}$ECAT EXPORT$}$JWERTH$}$10/12/2017 10:18:57 AM$}$False
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$This program will create an Excel File from the GSS Database
+Program.Sub.Comments.End
